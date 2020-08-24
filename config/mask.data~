@@ -1,4 +1,4 @@
 classes=2
 train=data/mask/train.txt
-valid=data/mask/val.txt
+valid=data/mask/valid.txt
 names=data/mask/classes.names

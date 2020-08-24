@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
     parser.add_argument("--data_config", type=str, default="config/coco.data", help="path to data config file")
     parser.add_argument("--pretrained_weights", type=str, help="if specified starts from checkpoint model")
-    parser.add_argument("--n_cpu", type=int, default=10, help="number of cpu threads to use during batch generation")   
+    parser.add_argument("--n_cpu", type=int, default=10, help="number of cpu threads to use during batch generation")
     parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
     parser.add_argument("--checkpoint_interval", type=int, default=1, help="interval between saving model weights")
     parser.add_argument("--evaluation_interval", type=int, default=1, help="interval evaluations on validation set")
@@ -172,7 +172,11 @@ if __name__ == "__main__":
             # Print class APs and mAP
             ap_table = [["Index", "Class name", "AP"]]
             for i, c in enumerate(ap_class):
-                ap_table += [[c, class_names[c], "%.5f" % AP[i]]]
+                try:
+                    ap_table += [[c, class_names[c], "%.5f" % AP[i]]]
+                except Exception as e:
+                    pdb.set_trace()
+
             print(AsciiTable(ap_table).table)
             print(f"---- mAP {AP.mean()}")
 

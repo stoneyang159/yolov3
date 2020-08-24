@@ -20,7 +20,9 @@ def load_classes(path):
     Loads class labels at 'path'
     """
     fp = open(path, "r")
-    names = fp.read().split("\n")[:-1]
+    # names = fp.read().split("\n")[:-1]
+    names = fp.read().split("\n")
+    names = [x for x in names if x != '']
     return names
 
 

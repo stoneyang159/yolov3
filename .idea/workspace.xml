@@ -20,15 +20,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="133b54ec-f108-4527-b630-dd6d8592882a" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/divide_train_val.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/mask/classes.names" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/data/xml2yolotxt.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/PyTorch-YOLOv3.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/PyTorch-YOLOv3.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config/mask.data" beforeDir="false" afterPath="$PROJECT_DIR$/config/mask.data" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/train.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/utils/datasets.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/datasets.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/utils/utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/笔记.md" beforeDir="false" afterPath="$PROJECT_DIR$/笔记.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -185,7 +181,7 @@
       <updated>1598144492531</updated>
       <workItem from="1598144493780" duration="5571000" />
       <workItem from="1598245945868" duration="1190000" />
-      <workItem from="1598247787511" duration="6033000" />
+      <workItem from="1598247787511" duration="8035000" />
     </task>
     <servers />
   </component>
