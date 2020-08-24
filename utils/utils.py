@@ -182,6 +182,25 @@ def get_batch_statistics(outputs, targets, iou_threshold):
 
 
 def bbox_wh_iou(wh1, wh2):
+    # wh1: anchor (2) // anchors: (3, 2)
+    # wh2: target_wh (n_boxes, 2)
+    # wh2.t(): (2, n_boxes)
+    # e.g
+    # wh1 = torch.Tensor(np.random.random((2)))
+    # wh2 = torch.Tensor(np.random.random((2, 5)))
+    # wh1: tensor([0.5401, 0.1042])
+    # wh2: tensor([[0.6327, 0.2902, 0.6464, 0.3725, 0.8088],
+    #              [0.2016, 0.0760, 0.9205, 0.3213, 0.7930]])
+    # w1: tensor(0.5401)
+    # h1: tensor(0.1042)
+    # w2: tensor([0.6327, 0.2902, 0.6464, 0.3725, 0.8088])
+    # h2: tensor([0.2016, 0.0760, 0.9205, 0.3213, 0.7930])
+    # torch.min()
+    # minw = torch.min(w1, w2)——>tensor([0.5401, 0.2902, 0.5401, 0.3725, 0.5401])
+    # minh = torch.min(h1, h2)——>tensor([0.1042, 0.0760, 0.1042, 0.1042, 0.1042])
+    # inter_area = minw * minh = tensor([0.0563, 0.0221, 0.0563, 0.0388, 0.0563])
+    # stack后final res shape:
+    # e.g.(3, 5) ——>(num_anchor, n_boxes)
     wh2 = wh2.t()
     w1, h1 = wh1[0], wh1[1]
     w2, h2 = wh2[0], wh2[1]
@@ -265,57 +284,91 @@ def non_max_suppression(prediction, conf_thres=0.5, nms_thres=0.4):
 
 
 def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
+    """
+    generate masks & t·
+    :param pred_boxes: 预测的bbox(0, 13) (b, num_anchor, grid_size, grid_size, 4) -> (b, 3, 13, 13, 4)
+    :param pred_cls: 预测的类别概率(0, 1) (b, num_anchor, grid_size, grid_size, n_classes) -> (b, 3, 13, 13, 80)
+    :param target: label(0, 1) (n_boxes, 6), 第二个维度有6个值，分别为: box所属图片在本batch中的index， 类别index， xc, yc, w, h
+    :param anchors: tensor([[3.625, 2.8125], [4.875, 6.1875], [11.65625, 10.1875]]) (num_anchor, 2) -> (3, 2-)->aw, ah
+    :param ignore_thres: hard coded, 0.5
+    :return: masks & t·
+    """
 
     ByteTensor = torch.cuda.ByteTensor if pred_boxes.is_cuda else torch.ByteTensor
     FloatTensor = torch.cuda.FloatTensor if pred_boxes.is_cuda else torch.FloatTensor
 
-    nB = pred_boxes.size(0)
-    nA = pred_boxes.size(1)
-    nC = pred_cls.size(-1)
-    nG = pred_boxes.size(2)
+    nB = pred_boxes.size(0)     # batch size
+    nA = pred_boxes.size(1)     # anchor size: 3
+    nC = pred_cls.size(-1)      # class size: 80
+    nG = pred_boxes.size(2)     # grid size: 13
 
     # Output tensors
-    obj_mask = ByteTensor(nB, nA, nG, nG).fill_(0)
-    noobj_mask = ByteTensor(nB, nA, nG, nG).fill_(1)
-    class_mask = FloatTensor(nB, nA, nG, nG).fill_(0)
-    iou_scores = FloatTensor(nB, nA, nG, nG).fill_(0)
-    tx = FloatTensor(nB, nA, nG, nG).fill_(0)
-    ty = FloatTensor(nB, nA, nG, nG).fill_(0)
-    tw = FloatTensor(nB, nA, nG, nG).fill_(0)
-    th = FloatTensor(nB, nA, nG, nG).fill_(0)
-    tcls = FloatTensor(nB, nA, nG, nG, nC).fill_(0)
+    obj_mask = ByteTensor(nB, nA, nG, nG).fill_(0)      # (b, 3, 13, 13)
+    noobj_mask = ByteTensor(nB, nA, nG, nG).fill_(1)    # (b, 3, 13, 13)    # mostly candidates are noobj
+    class_mask = FloatTensor(nB, nA, nG, nG).fill_(0)   # (b, 3, 13, 13)
+    iou_scores = FloatTensor(nB, nA, nG, nG).fill_(0)   # (b, 3, 13, 13)
+    tx = FloatTensor(nB, nA, nG, nG).fill_(0)           # (b, 3, 13, 13)
+    ty = FloatTensor(nB, nA, nG, nG).fill_(0)           # (b, 3, 13, 13)
+    tw = FloatTensor(nB, nA, nG, nG).fill_(0)           # (b, 3, 13, 13)
+    th = FloatTensor(nB, nA, nG, nG).fill_(0)           # (b, 3, 13, 13)
+    tcls = FloatTensor(nB, nA, nG, nG, nC).fill_(0)     # (b, 3, 13, 13, 80)
 
     # Convert to position relative to box
-    target_boxes = target[:, 2:6] * nG
-    gxy = target_boxes[:, :2]
-    gwh = target_boxes[:, 2:]
+    target_boxes = target[:, 2:6] * nG      # (0, 1)->(0, 13) (n_boxes, 6)
+    gxy = target_boxes[:, :2]               # (n_boxes, 2)
+    gwh = target_boxes[:, 2:]               # (n_boxes, 2)
     # Get anchors with best iou
+    # 仅依靠w&h 计算target box和anchor box的交并比， (num_anchor, n_boxes)
     ious = torch.stack([bbox_wh_iou(anchor, gwh) for anchor in anchors])
-    best_ious, best_n = ious.max(0)
+    # e.g, 每个anchor都和每个target bbox去算iou，结果存成矩阵(num_anchor, n_boxes)
+    #                box0    box1    box2    box3    box4
+    # ious=tensor([[0.7874, 0.9385, 0.5149, 0.0614, 0.3477],    anchor0
+    #              [0.2096, 0.5534, 0.5883, 0.2005, 0.5787],    anchor1
+    #              [0.8264, 0.6750, 0.4562, 0.2156, 0.7026]])   anchor2
+    # best_ious:
+    # tensor([0.8264, 0.9385, 0.5883, 0.2156, 0.7026])
+    # best_n:
+    # 属于第几个bbox：0, 1, 2, 3, 4
+    #       tensor([2, 0, 1, 2, 2])   属于第几个anchor
+    best_ious, best_n = ious.max(0)     # 最大iou, 与target box交并比最大的anchor的index // [n_boxes], [n_boxes]
+
     # Separate target values
+    # target[:, :2]: (n_boxes, 2) -> img index, class index
+    # target[].t(): (2, n_boxes) -> b: img index in batch, torch.Size([n_boxes]),
+    #                               target_labels: class index, torch.Size([n_boxes])
     b, target_labels = target[:, :2].long().t()
-    gx, gy = gxy.t()
-    gw, gh = gwh.t()
-    gi, gj = gxy.long().t()
-    # Set masks
-    obj_mask[b, best_n, gj, gi] = 1
-    noobj_mask[b, best_n, gj, gi] = 0
+    # gxy.t().shape = shape(gwh.t())=(2, n_boxes)
+    gx, gy = gxy.t()            # gx = gxy.t()[0], gy = gxy.t()[1]
+    gw, gh = gwh.t()            # gw = gwh.t()[0], gh = gwh.t()[1]
+    gi, gj = gxy.long().t()     # .long()去除小数点
+    # Set masks，这里的b是batch中的第几个
+    obj_mask[b, best_n, gj, gi] = 1     # 物体中心点落在的那个cell中的，与target object iou最大的那个3个anchor中的那1个，被设成1
+    noobj_mask[b, best_n, gj, gi] = 0   # 其相应的noobj_mask被设成0
 
     # Set noobj mask to zero where iou exceeds ignore threshold
+    # ious.t():
+    # shape: (n_boxes, num_anchor)
+    # i: box id
+    # b[i]: img index in that batch
+    # E.g 假设有4个boxes，其所属图片在batch中的index为[0, 0, 1, 2], 即前2个boxes都属于本batch中的第0张图
+    #     则b[0] = b[1] = 0 都应所属图片在batch中的index，即batch中的第几张图
     for i, anchor_ious in enumerate(ious.t()):
+        # 如果anchor_iou>ignore_thres，则即使它不是obj(非best_n)，同样不算noobj
         noobj_mask[b[i], anchor_ious > ignore_thres, gj[i], gi[i]] = 0
 
     # Coordinates
-    tx[b, best_n, gj, gi] = gx - gx.floor()
-    ty[b, best_n, gj, gi] = gy - gy.floor()
+    tx[b, best_n, gj, gi] = gx - gx.floor()     # x_offset (0, 1)
+    ty[b, best_n, gj, gi] = gy - gy.floor()     # y_offset (0, 1)
     # Width and height
     tw[b, best_n, gj, gi] = torch.log(gw / anchors[best_n][:, 0] + 1e-16)
     th[b, best_n, gj, gi] = torch.log(gh / anchors[best_n][:, 1] + 1e-16)
     # One-hot encoding of label
     tcls[b, best_n, gj, gi, target_labels] = 1
     # Compute label correctness and iou at best anchor
+    # 这两个是为了评价用，不参与实际回归
+    # pred_cls与target_label匹配上了，则class_mask所对应的grid_xy为1，否则为0
     class_mask[b, best_n, gj, gi] = (pred_cls[b, best_n, gj, gi].argmax(-1) == target_labels).float()
     iou_scores[b, best_n, gj, gi] = bbox_iou(pred_boxes[b, best_n, gj, gi], target_boxes, x1y1x2y2=False)
 
-    tconf = obj_mask.float()
+    tconf = obj_mask.float()        # target confidence
     return iou_scores, class_mask, obj_mask, noobj_mask, tx, ty, tw, th, tcls, tconf

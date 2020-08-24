@@ -115,11 +115,12 @@ class ListDataset(Dataset):
             y1 += pad[2]
             x2 += pad[1]
             y2 += pad[3]
-            # Returns (x, y, w, h)
-            boxes[:, 1] = ((x1 + x2) / 2) / padded_w
-            boxes[:, 2] = ((y1 + y2) / 2) / padded_h
-            boxes[:, 3] *= w_factor / padded_w
-            boxes[:, 4] *= h_factor / padded_h
+            # boxes[:, 0] => class id
+            # Returns (xc, yc, w, h)
+            boxes[:, 1] = ((x1 + x2) / 2) / padded_w        # newer center x
+            boxes[:, 2] = ((y1 + y2) / 2) / padded_h        # newer center y
+            boxes[:, 3] *= w_factor / padded_w              # newer width
+            boxes[:, 4] *= h_factor / padded_h              # newer height
 
             targets = torch.zeros((len(boxes), 6))
             targets[:, 1:] = boxes

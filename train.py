@@ -53,7 +53,7 @@ if __name__ == "__main__":
     class_names = load_classes(data_config["names"])
 
     # Initiate model
-    model = Darknet(opt.model_def).to(device)
+    model = Darknet(opt.model_def).to(device)       # default="config/yolov3.cfg"
     model.apply(weights_init_normal)
 
     # If specified we start from checkpoint
@@ -99,10 +99,10 @@ if __name__ == "__main__":
         for batch_i, (_, imgs, targets) in enumerate(dataloader):
             batches_done = len(dataloader) * epoch + batch_i
 
-            imgs = Variable(imgs.to(device))
+            imgs = imgs.to(device)
             targets = Variable(targets.to(device), requires_grad=False)
 
-            loss, outputs = model(imgs, targets)
+            loss, outputs = model(imgs, targets)        # 对应darknet中的forward
             loss.backward()
 
             if batches_done % opt.gradient_accumulations:
