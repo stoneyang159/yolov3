@@ -1,0 +1,1 @@
+/home/lhw/czcv_2t_workspace/yz/face_mask/train.txt

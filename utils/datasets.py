@@ -61,10 +61,21 @@ class ListDataset(Dataset):
         with open(list_path, "r") as file:
             self.img_files = file.readlines()
 
-        self.label_files = [
-            path.replace("images", "labels").replace(".png", ".txt").replace(".jpg", ".txt")
-            for path in self.img_files
-        ]
+        assert len(self.img_files) > 0
+
+        if 'images' in self.img_files[0]:
+            self.label_files = [
+                path.replace("images", "labels").replace(".png", ".txt").replace(".jpg", ".txt")
+                for path in self.img_files
+            ]
+        elif 'JPEGImages' in self.img_files[0]:
+            self.label_files = [
+                path.replace("JPEGImages", "labels").replace(".png", ".txt").replace(".jpg", ".txt")
+                for path in self.img_files
+            ]
+        else:
+            raise NotImplementedError
+
         self.img_size = img_size
         self.max_objects = 100
         self.augment = augment
